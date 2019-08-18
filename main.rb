@@ -2,6 +2,7 @@
 # cliotp is a console cross-platform, user-friendly OTP client/tool
 # used to manage secret keys and generate security codes quickly and effectively.
 # https://github.com/noskla/cliotp.rb
+# This piece of software is licensed under the MIT License.
 
 require 'rotp'     			# https://github.com/mdp/rotp
 require 'json'     			# https://github.com/flori/json
