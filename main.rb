@@ -33,7 +33,42 @@ def get_from_entries_file (entry_name)
 	#		 'secret-key'   : string     : Secret key specified under the entry_name ID
 	#
 	
+	File.open($config_file["Main"]["entries_file_path"], "r") do |json_file|
 	
+		entries = JSON.parse(json_file.read())
+		json_file.close()
+		
+		if not entries.include? entry_name
+			
+			return {
+				"status" => false,
+				"status-msg" => "Entry does not exist.",
+				"secret-key" => ""
+			}
+			
+		else
+		
+			begin
+				secret_key = entries[entry_name].decrypt(
+					:symmetric, :algorithm => "des-ecb", :password => $passphrase
+				)
+			rescue OpenSSL::Cipher::CipherError
+				return {
+					"status" => false,
+					"status-msg" => "Wrong decryption passphrase.",
+					"secret-key" => ""
+				}
+			end
+		
+			return {
+				"status" => true,
+				"status-msg" => "Success.",
+				"secret-key" => secret_key
+			}
+		
+		end
+	
+	end
 	
 end
 
@@ -74,10 +109,15 @@ def add_entry (entry_name, secret_key)
 	File.open($config_file["Main"]["entries_file_path"], "a+") do |json_file|
 		
 		entries = JSON.parse(json_file.read())
+		
+		if entries.include? entry_name
+			json_file.close
+			return {"status" => false, "status-msg" => "This entry already exists. Use 'rem' to remove it."}
+		end
+		
 		json_file.truncate(0)
 		
-		secret_key = secret_key.encrypt(:symmetric, :password => $passphrase)
-		out("Encrypted secret key is '" + secret_key + "'", 2)
+		secret_key = secret_key.encrypt(:symmetric, :algorithm => "des-ecb", :password => $passphrase)
 		
 		entries[entry_name] = secret_key
 		json_file.puts(JSON.generate(entries))
@@ -85,7 +125,7 @@ def add_entry (entry_name, secret_key)
 		
 	end
 
-	return {'status' => true, 'status-mesg' => 'test'}
+	return {'status' => true, 'status-msg' => 'Success.'}
 
 end
 
@@ -145,7 +185,7 @@ end
 # (Ruby equivalent of Python's __name__ == "__main__")
 if __FILE__ == $0
 	
-	puts "", "\t\t:: cliotp ::", ""
+	puts "", "\t:: cliotp ::", ""
 	
 	# Load configuration file.
 	$config_file = IniFile.load($CFG_INI_PATH)
@@ -160,7 +200,6 @@ if __FILE__ == $0
 	if $config_file["Main"]["use_bash_colors"]
 		
 		puts "", "Command combinations:"
-		puts "\t\e[1m\e[36madd\e[0m <entry-name> <secret-key>"
 		puts "\t\e[1m\e[36madd\e[0m <entry-name> <secret-key>"
 		puts "\t\e[1m\e[36mgen\e[0m <entry-name>"
 		puts "\t\e[1m\e[36mlst\e[0m"
@@ -184,9 +223,14 @@ if __FILE__ == $0
 	# Loop until given_arg starts with "exit"
 	while given_arg = Readline.readline(":: ", true)
 		
-		break if given_arg.downcase.start_with?("exit", "quit")
+		if given_arg.downcase.start_with?("exit", "quit")
+			
+			out("Bye bye~!", 1)
+			break
+			
+		end
+		
 		arguments = given_arg.split(" ")
-		p arguments
 		
 		case arguments.first.downcase
 			
@@ -198,10 +242,16 @@ if __FILE__ == $0
 				entry_name.nil? ? out("Missing argument.", 0) : nil
 				secret_key.nil? ? out("Missing argument.", 0) : nil
 				
-				add_entry(entry_name, secret_key)
+				response = add_entry(entry_name, secret_key)
+				response["status"]? out("Added!", 1) : out(response["status-msg"], 0)
 				
 			when "gen"
-			
+				
+				entry_name = arguments[1]
+				entry_name.nil? ? out("Missing argument.", 0) : nil
+				
+				secret_key = get_from_entries_file(entry_name)
+				p secret_key
 			
 			when "lst"
 			
